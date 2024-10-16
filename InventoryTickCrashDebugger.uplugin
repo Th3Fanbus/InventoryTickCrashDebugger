@@ -1,7 +1,7 @@
 {
 	"FileVersion": 3,
 	"Version": 0,
-	"VersionName": "0.0.2",
+	"VersionName": "0.1.0",
 	"FriendlyName": "InventoryTickCrashDebugger",
 	"Description": "Cursed crash debugger",
 	"Category": "Modding",
@@ -25,9 +25,11 @@
 		{
 			"Name": "SML",
 			"Enabled": true,
-			"SemVersion": "^3.7.0"
+			"SemVersion": "^3.8.0"
 		}
 	],
-	"SemVersion": "0.0.2",
-	"AcceptsAnyRemoteVersion": true
+	"SemVersion": "0.1.0",
+	"AcceptsAnyRemoteVersion": true,
+	"GameVersion": ">=365306",
+	"RequiredOnRemote": false
 }

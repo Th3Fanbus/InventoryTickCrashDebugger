@@ -3,10 +3,11 @@
 #include "InventoryTickCrashDebugger.h"
 #include "FGInventoryComponent.h"
 #include "Buildables/FGBuildable.h"
-#include "Replication/FGReplicationDetailActor.h"
+//#include "Replication/FGReplicationDetailActor.h"
 #include "Patching/NativeHookManager.h"
 #include "FGPlayerController.h"
 #include "Player/SMLRemoteCallObject.h"
+#include "Kismet/GameplayStatics.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogInvCrashDbg, Log, All);
 
@@ -25,7 +26,7 @@ namespace Th3
 	static FORCEINLINE FString InvItemToStr(const FInventoryItem& Item)
 	{
 		if (Item.HasState()) {
-			return FString::Printf(TEXT("[%s (%d) ---> %s]"), *Th3::GetNameSafe(Item.GetItemClass()), Item.GetItemStackSize(), *Th3::GetNameSafe(Item.ItemState.Get()));
+			return FString::Printf(TEXT("[%s (%d) ---> %s]"), *Th3::GetNameSafe(Item.GetItemClass()), Item.GetItemStackSize(), *Item.GetItemState().ToString());
 		} else {
 			return FString::Printf(TEXT("[%s (%d)]"), *Th3::GetNameSafe(Item.GetItemClass()), Item.GetItemStackSize());
 		}
@@ -62,7 +63,7 @@ namespace Th3
 class HFGInventoryComponent
 {
 public:
-	static void OnItemsRemoved(TCallScope<void(__cdecl*)(UFGInventoryComponent*, int32, int32, FInventoryItem)>& scope, UFGInventoryComponent* self, int32 idx, int32 num, FInventoryItem item)
+	static void OnItemsRemoved(TCallScope<void(__cdecl*)(UFGInventoryComponent*, int32, int32, const FInventoryItem&, UFGInventoryComponent*)>& scope, UFGInventoryComponent* self, int32 idx, int32 num, const FInventoryItem& item, UFGInventoryComponent* targetInventory)
 	{
 		if (not self) {
 			UE_LOG(LogInvCrashDbg, Error, TEXT("SELF IS NULL???"));
@@ -73,19 +74,21 @@ public:
 			FString ThreadName = FThreadManager::Get().GetThreadName(ThreadID);
 			UE_LOG(LogInvCrashDbg, Error, TEXT("INVALID INVENTORY ITEM CAUGHT"));
 			UE_LOG(LogInvCrashDbg, Error, TEXT("ON THREAD '%s' (%u)"), *ThreadName, ThreadID);
-			UE_LOG(LogInvCrashDbg, Error, TEXT("FUNCTION CALL: %s(%s, %d, %d, %s)"), *FString(__func__), *Th3::GetNameSafe(self), idx, num, *Th3::InvItemToStr(item));
+			UE_LOG(LogInvCrashDbg, Error, TEXT("FUNCTION CALL: %s(%s, %d, %d, %s, %s)"), *FString(__func__), *Th3::GetNameSafe(self), idx, num, *Th3::InvItemToStr(item), *Th3::GetNameSafe(targetInventory));
 			UE_LOG(LogInvCrashDbg, Error, TEXT("    COMPONENT: %s"), *Th3::GetPathSafe(self));
 			UE_LOG(LogInvCrashDbg, Error, TEXT("    COMPCLASS: %s"), *Th3::GetPathSafe(self->GetClass()));
 			UE_LOG(LogInvCrashDbg, Error, TEXT("    INV OWNER: %s"), *Th3::GetPathSafe(self->GetOwner()));
 			if (AActor* Owner = self->GetOwner()) {
 				UE_LOG(LogInvCrashDbg, Error, TEXT("    OWNER CLS: %s"), *Th3::GetPathSafe(Owner->GetClass()));
 				UE_LOG(LogInvCrashDbg, Error, TEXT("    OWNER LOC: %s"), *Owner->GetActorLocation().ToString());
+#if 0
 				if (AFGReplicationDetailActor* ReplicationActor = Cast<AFGReplicationDetailActor>(Owner)) {
 					AFGBuildable* Buildable = ReplicationActor->GetOwningBuildable();
 					UE_LOG(LogInvCrashDbg, Error, TEXT("    BUILDABLE: %s"), *Th3::GetPathSafe(Buildable));
 					UE_LOG(LogInvCrashDbg, Error, TEXT("    BUILD CLS: %s"), *Th3::GetPathSafe(Buildable->GetClass()));
 					UE_LOG(LogInvCrashDbg, Error, TEXT("    BUILD LOC: %s"), *Buildable->GetActorLocation().ToString());
 				}
+#endif
 			}
 			UE_LOG(LogInvCrashDbg, Error, TEXT("CANCELLING EXEC TO AVOID CRASH"));
 			scope.Cancel();
