@@ -63,6 +63,34 @@ namespace Th3
 class HFGInventoryComponent
 {
 public:
+	static void OnItemsAdded(TCallScope<void(__cdecl*)(UFGInventoryComponent*, const int32, const int32, UFGInventoryComponent*)>& scope, UFGInventoryComponent* self, const int32 idx, const int32 num, UFGInventoryComponent* sourceInventory)
+	{
+		if (not self) {
+			UE_LOG(LogInvCrashDbg, Error, TEXT("SELF IS NULL???"));
+			return;
+		}
+		if (not IsValid(self->mInventoryStacks[idx].Item.GetItemClass())) {
+			uint32 ThreadID = FPlatformTLS::GetCurrentThreadId();
+			FString ThreadName = FThreadManager::Get().GetThreadName(ThreadID);
+			UE_LOG(LogInvCrashDbg, Error, TEXT("INVALID INVENTORY ITEM CAUGHT"));
+			UE_LOG(LogInvCrashDbg, Error, TEXT("ON THREAD '%s' (%u)"), *ThreadName, ThreadID);
+			UE_LOG(LogInvCrashDbg, Error, TEXT("FUNCTION CALL: %s(%s, %d, %d, %s)"), *FString(__func__), *Th3::GetNameSafe(self), idx, num, *Th3::GetNameSafe(sourceInventory));
+			UE_LOG(LogInvCrashDbg, Error, TEXT("    COMPONENT: %s"), *Th3::GetPathSafe(self));
+			UE_LOG(LogInvCrashDbg, Error, TEXT("    COMPCLASS: %s"), *Th3::GetPathSafe(self->GetClass()));
+			UE_LOG(LogInvCrashDbg, Error, TEXT("    INV OWNER: %s"), *Th3::GetPathSafe(self->GetOwner()));
+			if (AActor* Owner = self->GetOwner()) {
+				UE_LOG(LogInvCrashDbg, Error, TEXT("    OWNER CLS: %s"), *Th3::GetPathSafe(Owner->GetClass()));
+				UE_LOG(LogInvCrashDbg, Error, TEXT("    OWNER LOC: %s"), *Owner->GetActorLocation().ToString());
+			}
+			UE_LOG(LogInvCrashDbg, Error, TEXT("CANCELLING EXEC TO AVOID CRASH"));
+			scope.Cancel();
+			UObject* WorldContext = IsValid(self->GetOwner()) ? static_cast<UObject*>(self->GetOwner()) : static_cast<UObject*>(self);
+			AsyncTask(ENamedThreads::GameThread, [WorldContext]() {
+				Th3::ShowRestartRequired(WorldContext);
+			});
+		}
+	}
+	
 	static void OnItemsRemoved(TCallScope<void(__cdecl*)(UFGInventoryComponent*, int32, int32, const FInventoryItem&, UFGInventoryComponent*)>& scope, UFGInventoryComponent* self, int32 idx, int32 num, const FInventoryItem& item, UFGInventoryComponent* targetInventory)
 	{
 		if (not self) {
@@ -81,14 +109,6 @@ public:
 			if (AActor* Owner = self->GetOwner()) {
 				UE_LOG(LogInvCrashDbg, Error, TEXT("    OWNER CLS: %s"), *Th3::GetPathSafe(Owner->GetClass()));
 				UE_LOG(LogInvCrashDbg, Error, TEXT("    OWNER LOC: %s"), *Owner->GetActorLocation().ToString());
-#if 0
-				if (AFGReplicationDetailActor* ReplicationActor = Cast<AFGReplicationDetailActor>(Owner)) {
-					AFGBuildable* Buildable = ReplicationActor->GetOwningBuildable();
-					UE_LOG(LogInvCrashDbg, Error, TEXT("    BUILDABLE: %s"), *Th3::GetPathSafe(Buildable));
-					UE_LOG(LogInvCrashDbg, Error, TEXT("    BUILD CLS: %s"), *Th3::GetPathSafe(Buildable->GetClass()));
-					UE_LOG(LogInvCrashDbg, Error, TEXT("    BUILD LOC: %s"), *Buildable->GetActorLocation().ToString());
-				}
-#endif
 			}
 			UE_LOG(LogInvCrashDbg, Error, TEXT("CANCELLING EXEC TO AVOID CRASH"));
 			scope.Cancel();
@@ -103,6 +123,7 @@ public:
 void FInventoryTickCrashDebuggerModule::StartupModule()
 {
 	if (not WITH_EDITOR) {
+		SUBSCRIBE_UOBJECT_METHOD(UFGInventoryComponent, OnItemsAdded, &HFGInventoryComponent::OnItemsAdded);
 		SUBSCRIBE_UOBJECT_METHOD(UFGInventoryComponent, OnItemsRemoved, &HFGInventoryComponent::OnItemsRemoved);
 	}
 }
